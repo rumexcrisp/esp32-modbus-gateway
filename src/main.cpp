@@ -24,65 +24,62 @@ char pass[] = MY_PASS;                     // password for the WiFi network used
 uint16_t port = 502;                       // port of modbus server
 
 // Create a ModbusRTU client instance
-ModbusClientRTU MB(Serial2, GPIO_NUM_4);
+ModbusClientRTU RS485(Serial2);
 
-// Create bridge
-ModbusBridgeWiFi MBbridge;
+void handleData(ModbusMessage msg, uint32_t token) 
+{
+  Serial.printf("Response: serverID=%d, FC=%d, Token=%08X, length=%d:\n", msg.getServerID(), msg.getFunctionCode(), token, msg.size());
+  for (auto& byte : msg) {
+    Serial.printf("%02X ", byte);
+  }
+  Serial.println("");
+  Serial.printf("Response: %s\n", (const char *)msg.data());
+}
+
+void handleError(Error error, uint32_t token) 
+{
+  // ModbusError wraps the error code and provides a readable error message for it
+  ModbusError me(error);
+  Serial.printf("Error response: %02X - %s\n", error, (const char *)me);
+}
 
 // Setup() - initialization happens here
 void setup() {
 // Init Serial monitor
-  Serial.begin(115200);
+  Serial.begin(9600);
   while (!Serial) {}
   Serial.println("__ OK __");
 
-// Init Serial2 conneted to the RTU Modbus
-// (Fill in your data here!)
-  Serial2.begin(19200, SERIAL_8N1, GPIO_NUM_17, GPIO_NUM_16);
+  // Set up Serial2 connected to Modbus RTU
+  Serial2.begin(9600, SERIAL_8N1);
 
-// Connect to WiFi
-  WiFi.begin(ssid, pass);
-  delay(200);
-  while (WiFi.status() != WL_CONNECTED) {
-    Serial.print('.');
-    delay(1000);
-  }
-  IPAddress wIP = WiFi.localIP();
-  Serial.printf("IP address: %u.%u.%u.%u\n", wIP[0], wIP[1], wIP[2], wIP[3]);
+  // Set up ModbusClientRTU client.
+  // - provide onData and onError handler functions
+  RS485.onDataHandler(&handleData);
+  RS485.onErrorHandler(&handleError);
 
-// Set RTU Modbus message timeout to 2000ms
-  MB.setTimeout(2000);
-// Start ModbusRTU background task on core 1
-  MB.begin(1);
+  // Set message timeout to 2000ms
+  RS485.setTimeout(2000);
 
-// Define and start WiFi bridge
-// ServerID 4: Server with remote serverID 1, accessed through RTU client MB
-//             All FCs accepted, with the exception of FC 06
-  MBbridge.attachServer(4, 1, ANY_FUNCTION_CODE, &MB);
-  MBbridge.denyFunctionCode(4, 6);
-  
-// ServerID 5: Server with remote serverID 4, accessed through RTU client MB
-//             Only FCs 03 and 04 accepted
-  MBbridge.attachServer(5, 4, READ_HOLD_REGISTER, &MB);
-  MBbridge.addFunctionCode(5, READ_INPUT_REGISTER);
+  // Start ModbusClientRTU background task
+  RS485.begin(1);
 
-// Check: print out all combinations served to Serial
-  MBbridge.listServer();
-
-// Start the bridge. Port 502, 4 simultaneous clients allowed, 600ms inactivity to disconnect client
-  MBbridge.start(port, 4, 600);
-
-  Serial.printf("Use the shown IP and port %d to send requests!\n", port);
-
-// Your output on the Serial monitor should start with:
-//      __ OK __
-//      .IP address: 192.168.178.74
-//      [N] 1324| ModbusServer.cpp     [ 127] listServer: Server   4:  00 06
-//      [N] 1324| ModbusServer.cpp     [ 127] listServer: Server   5:  03 04
-//      Use the shown IP and port 502 to send requests!
+  Serial.write("Done with setup");
 }
 
 // loop() - nothing done here today!
 void loop() {
-  delay(10000);
+  if(Serial.available()) {
+    // Serial2.write(Serial.read());
+    int value1 = Serial.parseInt();
+    Serial.printf("Input: %d\n", value1);
+    int value2 = Serial.parseInt();
+    Serial.printf("Input: %d\n", value2);
+    Error err = RS485.addRequest(0x12345678, 1, READ_HOLD_REGISTER, value1, value2); // 16384
+    if (err!=SUCCESS) {
+      ModbusError e(err);
+      Serial.printf("Error creating request: %02X - %s\n", err, (const char *)e);
+    }
+  }
+  // delay(1000);
 }
