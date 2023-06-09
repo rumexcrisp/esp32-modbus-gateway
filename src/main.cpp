@@ -19,24 +19,25 @@
 #define MY_PASS "asdfghjkl67@76!"
 #endif
 
-char ssid[] = MY_SSID;                     // SSID and ...
-char pass[] = MY_PASS;                     // password for the WiFi network used
-uint16_t port = 502;                       // port of modbus server
+char ssid[] = MY_SSID; // SSID and ...
+char pass[] = MY_PASS; // password for the WiFi network used
+uint16_t port = 502;   // port of modbus server
 
 // Create a ModbusRTU client instance
 ModbusClientRTU RS485(Serial2);
 
-void handleData(ModbusMessage msg, uint32_t token) 
+void handleData(ModbusMessage msg, uint32_t token)
 {
   Serial.printf("Response: serverID=%d, FC=%d, Token=%08X, length=%d:\n", msg.getServerID(), msg.getFunctionCode(), token, msg.size());
-  for (auto& byte : msg) {
+  for (auto &byte : msg)
+  {
     Serial.printf("%02X ", byte);
   }
   Serial.println("");
   Serial.printf("Response: %s\n", (const char *)msg.data());
 }
 
-void handleError(Error error, uint32_t token) 
+void handleError(Error error, uint32_t token)
 {
   // ModbusError wraps the error code and provides a readable error message for it
   ModbusError me(error);
@@ -44,10 +45,13 @@ void handleError(Error error, uint32_t token)
 }
 
 // Setup() - initialization happens here
-void setup() {
-// Init Serial monitor
+void setup()
+{
+  // Init Serial monitor
   Serial.begin(9600);
-  while (!Serial) {}
+  while (!Serial)
+  {
+  }
   Serial.println("__ OK __");
 
   // Set up Serial2 connected to Modbus RTU
@@ -64,22 +68,31 @@ void setup() {
   // Start ModbusClientRTU background task
   RS485.begin(1);
 
-  Serial.write("Done with setup");
+  Serial.write("[Setup] Done");
 }
 
 // loop() - nothing done here today!
-void loop() {
-  if(Serial.available()) {
-    // Serial2.write(Serial.read());
-    int value1 = Serial.parseInt();
-    Serial.printf("Input: %d\n", value1);
-    int value2 = Serial.parseInt();
-    Serial.printf("Input: %d\n", value2);
-    Error err = RS485.addRequest(0x12345678, 1, READ_HOLD_REGISTER, value1, value2); // 16384
-    if (err!=SUCCESS) {
-      ModbusError e(err);
-      Serial.printf("Error creating request: %02X - %s\n", err, (const char *)e);
-    }
+void loop()
+{
+  String input;
+  // if(Serial.available()) {
+  // Serial.write("[Loop] Serial available\n");
+  Serial.printf("Please enter value1:\n");
+  if(Serial.available())
+    input = Serial.readString();
+  int value1 = input.toInt();
+  Serial.printf("Please enter value2:\n");
+  if(Serial.available())
+    input = Serial.readString();
+  int value2 = input.toInt();
+  Serial.printf("value1: %d, value2: %d\n", value1, value2);
+  // int abbMaxPower = 0x4008;
+  Error err = RS485.addRequest(0x12345678, 1, READ_HOLD_REGISTER, value1, value2); // 16384
+  if (err != SUCCESS)
+  {
+    ModbusError e(err);
+    Serial.printf("Error creating request: %02X - %s\n", err, (const char *)e);
   }
+  // }
   // delay(1000);
 }
